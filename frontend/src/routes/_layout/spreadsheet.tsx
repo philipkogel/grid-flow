@@ -1,9 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { HotTable } from '@handsontable/react';
 import { registerAllModules } from 'handsontable/registry';
 import 'handsontable/styles/handsontable.css';
 import 'handsontable/styles/ht-theme-main.css';
+import { useTheme } from '@/components/theme-provider';
 
 registerAllModules();
 
@@ -23,50 +24,30 @@ export const Route = createFileRoute('/_layout/spreadsheet')({
 });
 
 function SpreadsheetView() {
+  const { resolvedTheme } = useTheme();
+  const [themeName, setThemeName] = useState('ht-theme-main-dark-auto');
   const hotRef = useRef(null);
   const [output, setOutput] = useState('Click "Load" to load data from server');
-  const [isAutosave, setIsAutosave] = useState(false);
-  const autosaveClickCallback = (event: any) => {
-    const target = event.target;
-
-    setIsAutosave(target.checked);
-
-    if (target.checked) {
-      setOutput('Changes will be autosaved');
-    } else {
-      setOutput('Changes will not be autosaved');
-    }
-  };
+  console.log('Resolved theme:', resolvedTheme);
+  // Update theme when resolvedTheme changes
+  useEffect(() => {
+    setThemeName(
+      resolvedTheme === 'dark' ? 'ht-theme-main-dark-auto' : 'ht-theme-main',
+    );
+  }, [resolvedTheme]);
 
   const loadClickCallback = (event: any) => {
     const hot = hotRef.current?.hotInstance;
 
-    fetch('https://handsontable.com/docs/scripts/json/load.json').then(
-      (response) => {
-        response.json().then((data) => {
-          hot?.loadData(data.data);
-          // or, use `updateData()` to replace `data` without resetting states
-          setOutput('Data loaded');
-        });
-      },
-    );
-  };
-
-  const saveClickCallback = (event: any) => {
-    const hot = hotRef.current?.hotInstance;
-
-    // save all cell's data
-    fetch('https://handsontable.com/docs/scripts/json/save.json', {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ data: hot?.getData() }),
-    }).then(() => {
-      setOutput('Data saved');
-      console.log('The POST request is only used here for the demo purposes');
-    });
+    hot?.loadData([
+      ['', 'Kia', 'Nissan', 'Toyota', 'Honda', 'Mazda', 'Ford'],
+      ['2012', 10, 11, 12, 13, 15, 16],
+      ['2013', 10, 11, 12, 13, 15, 16],
+      ['2014', 10, 11, 12, 13, 15, 16],
+      ['2015', 10, 11, 12, 13, 15, 16],
+      ['2016', 10, 11, 12, 13, 15, 16],
+    ]);
+    setOutput('Data loaded');
   };
 
   return (
@@ -80,38 +61,22 @@ function SpreadsheetView() {
           >
             Load data
           </button>
-          <button
-            id='save'
-            className='button button--primary button--blue'
-            onClick={saveClickCallback}
-          >
-            Save data
-          </button>
-          <label>
-            <input
-              type='checkbox'
-              name='autosave'
-              id='autosave'
-              checked={isAutosave}
-              onClick={autosaveClickCallback}
-            />
-            Autosave
-          </label>
         </div>
         <output className='console' id='output'>
           {output}
         </output>
       </div>
       <HotTable
-        themeName='ht-theme-main'
+        themeName={themeName}
         ref={hotRef}
-        startRows={8}
-        startCols={6}
+        minCols={20}
+        startRows={20}
+        startCols={20}
         rowHeaders={true}
         colHeaders={true}
         height='auto'
-        autoWrapRow={true}
-        autoWrapCol={true}
+        // autoWrapRow={true}
+        // autoWrapCol={true}
         licenseKey='non-commercial-and-evaluation'
         afterChange={function (change, source) {
           if (source === 'loadData') {

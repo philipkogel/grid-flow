@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -118,7 +118,19 @@
     @apply bg-background text-foreground;
   }
   button,
-  [role="button"] {
+  [role='button'] {
     cursor: pointer;
+  }
+}
+
+/* HotTable dark mode styling */
+.dark {
+  .ht-theme-main {
+    --ht-header-bg-color: var(--muted);
+    --ht-header-text-color: var(--muted-foreground);
+    --ht-body-bg-color: var(--card);
+    --ht-body-text-color: var(--foreground);
+    --ht-body-border-color: var(--border);
+    --ht-data-cell-bg-color: var(--card);
   }
 }
