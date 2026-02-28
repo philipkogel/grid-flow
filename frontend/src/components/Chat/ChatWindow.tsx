@@ -4,6 +4,7 @@ import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { ChatThinking } from './ChatThinking';
 import { useChat } from '@/hooks/useChat';
+import { useSpreadsheetContext } from '@/hooks/useSpreadsheetContext';
 import { cn } from '@/lib/utils';
 
 interface ChatWindowProps {
@@ -17,6 +18,8 @@ export function ChatWindow({
   onClose,
   className,
 }: ChatWindowProps) {
+  const { getContext, applyAction } = useSpreadsheetContext();
+
   const {
     messages,
     isLoading,
@@ -25,7 +28,10 @@ export function ChatWindow({
     sendMessage,
     clearChat,
     messagesEndRef,
-  } = useChat();
+  } = useChat({
+    getSpreadsheetContext: getContext,
+    onAction: applyAction,
+  });
 
   if (!isOpen) return null;
 
@@ -40,7 +46,7 @@ export function ChatWindow({
       <div className='flex items-center justify-between border-b border-border px-4 py-3'>
         <div>
           <h2 className='font-semibold'>Assistant</h2>
-          <p className='text-xs text-muted-foreground'>Always here to help</p>
+          <p className='text-xs text-muted-foreground'>Ready to help</p>
         </div>
         <div className='flex gap-1'>
           <Button
@@ -67,8 +73,8 @@ export function ChatWindow({
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-2 py-2">
-        <div className="space-y-1">
+      <div className='flex-1 min-h-0 overflow-y-auto px-2 py-2'>
+        <div className='space-y-1'>
           {messages.map((message) => (
             <ChatMessage
               key={message.id}
@@ -88,6 +94,7 @@ export function ChatWindow({
         onChange={setInputValue}
         onSend={sendMessage}
         isLoading={isLoading}
+        placeholder='Ask about your data...'
       />
     </div>
   );

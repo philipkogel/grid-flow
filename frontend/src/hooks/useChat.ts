@@ -1,4 +1,9 @@
 import { useCallback, useRef, useEffect, useState } from 'react';
+import { OpenAPI } from '@/client';
+import type {
+  SpreadsheetContext,
+  SpreadsheetAction,
+} from './useSpreadsheetContext';
 
 export type MessageRole = 'user' | 'assistant';
 
@@ -9,6 +14,34 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+interface ChatApiRequest {
+  message: string;
+  context?: SpreadsheetContext | null;
+  history: { role: string; content: string }[];
+}
+
+interface ChatApiResponse {
+  response: string;
+  actions?: SpreadsheetAction[] | null;
+}
+
+/**
+ * Strip JSON code blocks from the response for display.
+ * Actions are handled separately, not shown in the chat.
+ */
+function cleanResponseForDisplay(response: string): string {
+  // Remove JSON code blocks (```json ... ```)
+  let cleaned = response.replace(/```json[\s\S]*?```/g, '').trim();
+  // Remove any trailing empty lines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  return cleaned || response;
+}
+
+interface UseChatOptions {
+  getSpreadsheetContext?: () => SpreadsheetContext | null;
+  onAction?: (action: SpreadsheetAction) => void;
+}
+
 interface UseChatReturn {
   messages: ChatMessage[];
   isLoading: boolean;
@@ -16,17 +49,48 @@ interface UseChatReturn {
   setInputValue: (value: string) => void;
   sendMessage: (content: string) => void;
   clearChat: () => void;
-  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesEndRef: React.RefObject<HTMLDivElement | null>;
 }
 
-export function useChat(
-  onSendMessage?: (message: string) => Promise<string>,
-): UseChatReturn {
+async function sendChatMessage(
+  request: ChatApiRequest,
+): Promise<ChatApiResponse> {
+  const token =
+    typeof OpenAPI.TOKEN === 'function'
+      ? await OpenAPI.TOKEN({} as never)
+      : OpenAPI.TOKEN;
+
+  console.log('Sending to API:', JSON.stringify(request, null, 2));
+
+  const response = await fetch(`${OpenAPI.BASE}/api/v1/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Chat API error:', response.status, errorText);
+    throw new Error(`Chat API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  console.log('API response:', data);
+  return data;
+}
+
+export function useChat(options: UseChatOptions = {}): UseChatReturn {
+  const { getSpreadsheetContext, onAction } = options;
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
       role: 'assistant',
-      content: "Hey! I'm your AI assistant. How can I help you today?",
+      content:
+        "Hey! I'm your AI assistant. I can help you analyze and work with your spreadsheet data. What would you like to do?",
       timestamp: new Date(Date.now() - 60000),
     },
   ]);
@@ -60,25 +124,39 @@ export function useChat(
       setIsLoading(true);
 
       try {
-        // If callback provided, use it; otherwise use mock response
-        let responseContent: string;
+        // Get current spreadsheet context
+        const currentContext = getSpreadsheetContext?.() ?? null;
+        console.log('Sending chat with context:', currentContext);
 
-        if (onSendMessage) {
-          responseContent = await onSendMessage(content);
-        } else {
-          // Mock response with delay
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          responseContent = `I received your message: "${content}". This is a demo response. Connect to an LLM API to enable real responses.`;
-        }
+        // Prepare history for API (last 10 messages)
+        const history = messages.slice(-10).map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+
+        const response = await sendChatMessage({
+          message: content.trim(),
+          context: currentContext,
+          history,
+        });
+
+        console.log('Received chat response:', response);
 
         const assistantMessage: ChatMessage = {
           id: generateId(),
           role: 'assistant',
-          content: responseContent,
+          content: cleanResponseForDisplay(response.response),
           timestamp: new Date(),
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
+
+        // Handle any actions returned by the AI
+        if (response.actions && onAction) {
+          for (const action of response.actions) {
+            onAction(action);
+          }
+        }
       } catch (error) {
         console.error('Error sending message:', error);
         const errorMessage: ChatMessage = {
@@ -92,7 +170,7 @@ export function useChat(
         setIsLoading(false);
       }
     },
-    [generateId, onSendMessage],
+    [generateId, messages, getSpreadsheetContext, onAction],
   );
 
   const clearChat = useCallback(() => {
@@ -100,7 +178,8 @@ export function useChat(
       {
         id: '1',
         role: 'assistant',
-        content: "Hey! I'm your AI assistant. How can I help you today?",
+        content:
+          "Hey! I'm your AI assistant. I can help you analyze and work with your spreadsheet data. What would you like to do?",
         timestamp: new Date(),
       },
     ]);

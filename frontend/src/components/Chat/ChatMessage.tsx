@@ -1,7 +1,6 @@
 import { MessageRole } from '@/hooks/useChat';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cva, type VariantProps } from 'class-variance-authority';
-import { cn } from '@/lib/utils';
 
 const messageVariants = cva('flex w-full gap-3 px-4 py-3', {
   variants: {
@@ -57,7 +56,9 @@ export function ChatMessage({ role, content, timestamp }: ChatMessageProps) {
             : 'flex flex-col items-start gap-1'
         }
       >
-        <div className={messageBubbleVariants({ role })}>{content}</div>
+        <div className={messageBubbleVariants({ role })}>
+          <div className='whitespace-pre-wrap'>{content}</div>
+        </div>
         <span className='text-xs text-muted-foreground px-2'>
           {formattedTime}
         </span>
